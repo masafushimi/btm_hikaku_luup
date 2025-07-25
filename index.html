@@ -6,13 +6,12 @@
     <title>インタラクティブBTM選定ガイド</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.4.0"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
     <!-- Chosen Palette: Warm Neutrals -->
     <!-- Application Structure Plan: The application is designed to guide the user from a high-level summary to detailed, interactive exploration, and finally to a personalized recommendation. It starts with the main recommendation upfront (Executive Summary), followed by an interactive dashboard allowing comparison by different facets (cost, features, etc.). This is more user-centric than a linear report, enabling users to focus on their priorities. It concludes with a simple quiz to provide a tailored suggestion, making the report's findings more actionable. -->
-    <!-- Visualization & Content Choices: Report Info -> Goal -> Viz/Presentation Method -> Interaction -> Justification. 1. Overall Strengths -> Compare -> Radar Chart -> View -> Provides a quick, multi-dimensional visual summary of qualitative analysis. 2. Cost Structure -> Compare -> Bar Chart -> View -> Visually contrasts different cost models, using annotations for non-numeric data. 3. Feature List -> Compare -> Icon-based Cards -> View -> More scannable and visually engaging than a dense table. 4. Final Recommendation -> Guide -> Interactive Quiz -> User Selection -> Personalizes the report's conclusion and increases user engagement. All interactions are handled by vanilla JS. -->
+    <!-- Visualization & Content Choices: Report Info -> Goal -> Viz/Presentation Method -> Interaction -> Justification. 1. Overall Strengths -> Compare -> Radar Chart -> View -> Provides a quick, multi-dimensional visual summary of qualitative analysis. 2. Cost Structure -> Compare -> Icon-based Cards -> View -> Replaced bar chart of all-zero values with a card layout that clearly shows base fees and, more importantly, the differing fee models (the 'note'), which is more informative. 3. Feature List -> Compare -> Icon-based Cards -> View -> More scannable and visually engaging than a dense table. 4. Final Recommendation -> Guide -> Interactive Quiz -> User Selection -> Personalizes the report's conclusion and increases user engagement. All interactions are handled by vanilla JS. -->
     <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
     <style>
         html {
@@ -105,11 +104,9 @@
                     </div>
                 </div>
                 <div id="cost-content" class="tab-pane hidden">
-                    <h3 class="text-xl font-bold text-center mb-2">費用構造の比較</h3>
-                    <p class="text-sm text-stone-600 text-center mb-4 max-w-2xl mx-auto">初期費用と月額費用をグラフで比較します。取扱手数料はモデルが異なるため、注釈で補足しています。</p>
-                    <div class="chart-container">
-                        <canvas id="costChart"></canvas>
-                    </div>
+                    <h3 class="text-xl font-bold text-center mb-4">費用構造の比較</h3>
+                    <p class="text-sm text-stone-600 text-center mb-8 max-w-2xl mx-auto">各サービスの費用構造を比較します。初期・月額費用は0円ですが、実際のコストは手数料モデルによって変動します。</p>
+                    <div id="cost-grid" class="grid md:grid-cols-3 gap-6"></div>
                 </div>
                 <div id="features-content" class="tab-pane hidden">
                     <h3 class="text-xl font-bold text-center mb-4">機能と手配範囲の比較</h3>
@@ -177,7 +174,7 @@
                         { icon: '✈️', text: '国内外132社の航空券（LCC含む）' },
                         { icon: '🏨', text: '64万軒のホテル' },
                         { icon: '🚅', text: '新幹線（チケットレス対応）' },
-                        { icon: '🔒', text: '強力な出張規定遵守機能' },
+                        { icon: '�', text: '強力な出張規定遵守機能' },
                         { icon: '🔄', text: '主要な経費精算システムと連携' },
                     ],
                     support: [
@@ -204,7 +201,7 @@
                     support: [
                         { icon: '📞', text: '旅行会社ならではの手厚い人的サポート' },
                         { icon: '👍', text: 'トラブル時の迅速な対応に定評' },
-                        { icon: '�', text: '基本的な危機管理機能を搭載' },
+                        { icon: '🌍', text: '基本的な危機管理機能を搭載' },
                     ],
                     recommendation: {
                         title: "推奨：出張手配プラス",
@@ -234,7 +231,7 @@
                 }
             };
 
-            let radarChart, costChart;
+            let radarChart;
 
             const tabButtons = document.querySelectorAll('.tab-button');
             const tabPanes = document.querySelectorAll('.tab-pane');
@@ -245,7 +242,7 @@
                 tabPanes.forEach(pane => pane.classList.toggle('active', pane.id === `${tab}-content`));
 
                 if (tab === 'overall') initRadarChart();
-                if (tab === 'cost') initCostChart();
+                if (tab === 'cost') renderCostGrid();
                 if (tab === 'features') renderGrid('features');
                 if (tab === 'support') renderGrid('support');
             }
@@ -314,51 +311,30 @@
                 });
             }
 
-            function initCostChart() {
-                const ctx = document.getElementById('costChart').getContext('2d');
-                if (costChart) costChart.destroy();
-                costChart = new Chart(ctx, {
-                    type: 'bar',
-                    data: {
-                        labels: [BTMData.pikapaka.name, BTMData.plus.name, BTMData.relo.name],
-                        datasets: [
-                            {
-                                label: '初期費用 (円)',
-                                data: [BTMData.pikapaka.costs.initial, BTMData.plus.costs.initial, BTMData.relo.costs.initial],
-                                backgroundColor: 'rgba(13, 148, 136, 0.7)',
-                            },
-                            {
-                                label: '月額費用 (円)',
-                                data: [BTMData.pikapaka.costs.monthly, BTMData.plus.costs.monthly, BTMData.relo.costs.monthly],
-                                backgroundColor: 'rgba(249, 115, 22, 0.7)',
-                            }
-                        ]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        scales: {
-                            y: { beginAtZero: true, ticks: { callback: value => `${value}円` } },
-                            x: { ticks: {
-                                callback: function(value) {
-                                    const label = this.getLabelForValue(value);
-                                    return label.length > 10 ? label.substring(0, 10) + '...' : label;
-                                }
-                            }}
-                        },
-                        plugins: {
-                            legend: { position: 'top' },
-                            tooltip: {
-                                callbacks: {
-                                    afterLabel: function(context) {
-                                        const companyKey = Object.keys(BTMData).find(key => BTMData[key].name === context.label);
-                                        if (!companyKey) return '';
-                                        return `手数料: ${BTMData[companyKey].costs.note}`;
-                                    }
-                                }
-                            },
-                        }
-                    }
+            function renderCostGrid() {
+                const container = document.getElementById('cost-grid');
+                container.innerHTML = '';
+                Object.values(BTMData).forEach(company => {
+                    const card = document.createElement('div');
+                    card.className = 'bg-stone-50 p-6 rounded-xl border flex flex-col';
+                    card.innerHTML = `
+                        <h4 class="font-bold text-lg mb-4 text-center text-stone-800">${company.name}</h4>
+                        <div class="flex-grow">
+                            <div class="mb-4">
+                                <p class="text-sm text-stone-600">初期費用</p>
+                                <p class="text-2xl font-bold text-teal-700">${company.costs.initial.toLocaleString()}円</p>
+                            </div>
+                            <div class="mb-4">
+                                <p class="text-sm text-stone-600">月額費用</p>
+                                <p class="text-2xl font-bold text-teal-700">${company.costs.monthly.toLocaleString()}円</p>
+                            </div>
+                            <div>
+                                <p class="text-sm font-semibold text-stone-600">手数料モデル</p>
+                                <p class="text-sm text-stone-700 mt-1 p-3 bg-stone-100 rounded-md">${company.costs.note}</p>
+                            </div>
+                        </div>
+                    `;
+                    container.appendChild(card);
                 });
             }
 
@@ -392,7 +368,7 @@
 
                     if (resultData) {
                         quizResultContainer.innerHTML = `
-                            <div class="bg-teal-50 border-l-4 border-teal-500 p-6 rounded-lg animate-fade-in">
+                            <div class="bg-teal-50 border-l-4 border-teal-500 p-6 rounded-lg">
                                 <h4 class="font-bold text-xl text-teal-800 mb-2">${resultData.title}</h4>
                                 <p class="text-teal-900">${resultData.description}</p>
                             </div>
